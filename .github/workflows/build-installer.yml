@@ -20,14 +20,10 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Setup Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        profile: minimal
-        override: true
+      uses: dtolnay/rust-toolchain@stable
         
     - name: Cache Rust dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/bin/
@@ -89,7 +85,7 @@ jobs:
         }
         
     - name: Upload installer as artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: hop-cli-installer
         path: ${{ env.INSTALLER_NAME }}
@@ -147,11 +143,9 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Setup Rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: stable
-        target: ${{ matrix.target }}
-        override: true
+        targets: ${{ matrix.target }}
         
     - name: Build binary
       run: cargo build --release --target ${{ matrix.target }}
@@ -165,7 +159,7 @@ jobs:
         fi
         
     - name: Upload binary
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: hop-cli-${{ matrix.target }}
         path: hop-${{ matrix.target }}${{ matrix.suffix }} 
