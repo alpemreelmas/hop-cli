@@ -51,7 +51,6 @@ desktop.ini
 *.so
 
 # === Installer and packaging artifacts ===
-*.nsi
 *.msi
 *.deb
 *.rpm
