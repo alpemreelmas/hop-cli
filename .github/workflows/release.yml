@@ -1,0 +1,114 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        default: 'v0.1.0'
+
+jobs:
+  create-release:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        
+    - name: Build release
+      run: cargo build --release
+      
+    - name: Install NSIS
+      run: |
+        $nsisUrl = "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.11/nsis-3.11-setup.exe"
+        $nsisInstaller = "$env:TEMP\nsis-setup.exe"
+        Invoke-WebRequest -Uri $nsisUrl -OutFile $nsisInstaller
+        Start-Process -FilePath $nsisInstaller -ArgumentList "/S" -Wait
+        $env:PATH += ";${env:ProgramFiles(x86)}\NSIS"
+        echo "${env:ProgramFiles(x86)}\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        
+    - name: Create installer
+      run: makensis installer-simple.nsi
+      
+    - name: Get version
+      id: version
+      run: |
+        if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+          $version = "${{ github.event.inputs.version }}"
+        } else {
+          $version = "${{ github.ref_name }}"
+        }
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+        $installerName = "hop-cli-installer-$version.exe"
+        echo "installer_name=$installerName" >> $env:GITHUB_OUTPUT
+        Rename-Item "hop-cli-installer.exe" $installerName
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.version }}
+        name: Hop CLI ${{ steps.version.outputs.version }}
+        files: ${{ steps.version.outputs.installer_name }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        body: |
+          ## 🚀 Installation Instructions
+          
+          ### Windows (Recommended)
+          1. **Download**: `${{ steps.version.outputs.installer_name }}`
+          2. **Run as Administrator**: Right-click → "Run as administrator"
+          3. **Follow the wizard**: Accept defaults or customize installation
+          4. **Test**: Open Command Prompt and run `hop --help`
+          
+          ### Alternative Installation Methods
+          ```bash
+          # Via Cargo (requires Rust)
+          cargo install --git ${{ github.server_url }}/${{ github.repository }}
+          
+          # Via PowerShell (Windows)
+          iwr -useb https://github.com/${{ github.repository }}/raw/main/install.ps1 | iex
+          ```
+          
+          ## ✨ Features
+          - 🖥️ **Manage SSH servers** - Add, edit, remove server configurations
+          - 🔐 **Easy connections** - Connect to servers with simple commands
+          - 📁 **File transfers** - Copy files to/from servers using SCP
+          - ⚡ **Remote execution** - Run commands on remote servers
+          - 📦 **Import/Export** - Backup and share server configurations
+          - 🎯 **Global installation** - Available from any terminal
+          
+          ## 🛠️ Quick Start
+          ```bash
+          # Add a server
+          hop add --name myserver --user ubuntu --ip 192.168.1.100
+          
+          # List servers
+          hop list
+          
+          # Connect to server
+          hop connect myserver
+          
+          # Copy file to server
+          hop copy myserver localfile.txt /remote/path/
+          ```
+          
+          ---
+          
+          **What's installed:**
+          - ✅ `hop.exe` in `C:\Program Files\Hop CLI\`
+          - ✅ Added to system PATH automatically
+          - ✅ Start Menu shortcuts created
+          - ✅ Uninstaller in Control Panel
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

@@ -1,0 +1,26 @@
+[package]
+name = "hop"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "A fast and minimal CLI tool to manage and connect to frequently used SSH servers"
+license = "MIT"
+readme = "readme.md"
+repository = "https://github.com/yourname/hop-cli"
+keywords = ["ssh", "cli", "server", "management"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "hop"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.4", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+dirs = "5.0"
+colored = "2.1"
+anyhow = "1.0"
+
+[dev-dependencies]
+tempfile = "3.8" 

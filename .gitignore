@@ -1,0 +1,69 @@
+# === Rust Build Artifacts ===
+/target/
+**/*.rs.bk
+
+# === Dependency Caches ===
+/Cargo.lock
+/.cargo/
+.cargo/
+.cargo-target/
+
+# If you're publishing a library, consider keeping Cargo.lock
+# Uncomment if it's a binary-only project:
+# /Cargo.lock
+
+# === IDEs and Editors ===
+
+# VS Code
+.vscode/
+
+# JetBrains (CLion, IntelliJ, etc.)
+.idea/
+*.iml
+*.iws
+out/
+
+# Sublime
+*.sublime-project
+*.sublime-workspace
+
+# === OS Files ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Logs and Temporary Files ===
+*.log
+*.tmp
+*.swp
+*.bak
+
+# === Windows ===
+*.exe
+*.dll
+*.pdb
+
+# === macOS ===
+*.dSYM/
+*.DS_Store
+
+# === Linux ===
+*.so
+
+# === Installer and packaging artifacts ===
+*.nsi
+*.msi
+*.deb
+*.rpm
+*.tar.gz
+*.zip
+*.7z
+*.app
+
+# === Coverage and Testing ===
+/coverage/
+*.profraw
+*.profdata
+
+# === Other Tools ===
+/dist/
