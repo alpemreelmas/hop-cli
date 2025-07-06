@@ -41,15 +41,11 @@ jobs:
       
     - name: Install NSIS
       run: |
-        # Download and install NSIS
-        $nsisUrl = "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.11/nsis-3.11-setup.exe"
-        $nsisInstaller = "$env:TEMP\nsis-setup.exe"
-        Invoke-WebRequest -Uri $nsisUrl -OutFile $nsisInstaller
-        Start-Process -FilePath $nsisInstaller -ArgumentList "/S" -Wait
+        # Use Chocolatey to install NSIS (more reliable)
+        choco install nsis -y
         
         # Add NSIS to PATH for this session
         $nsisPath = "${env:ProgramFiles(x86)}\NSIS"
-        $env:PATH += ";$nsisPath"
         echo "$nsisPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         
     - name: Verify NSIS installation
