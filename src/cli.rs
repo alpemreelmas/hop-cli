@@ -81,52 +81,7 @@ pub enum Commands {
         /// Initialize configuration file
         #[arg(short, long)]
         init: bool,
-    },
-
-    /// Copy files to/from servers using SCP
-    Copy {
-        /// Server name
-        server: String,
-
-        /// Source path (local or remote)
-        source: String,
-
-        /// Destination path (local or remote)
-        destination: String,
-
-        /// Copy from remote to local (default: local to remote)
-        #[arg(short, long)]
-        from: bool,
-    },
-
-    /// Execute a command on a remote server
-    Exec {
-        /// Server name
-        server: String,
-
-        /// Command to execute
-        command: String,
-    },
-
-    /// Import servers from a JSON file
-    Import {
-        /// Path to the JSON file to import
-        file: String,
-
-        /// Merge with existing servers (default: replace)
-        #[arg(short, long)]
-        merge: bool,
-    },
-
-    /// Export servers to a JSON file
-    Export {
-        /// Path to save the JSON file
-        file: String,
-
-        /// Pretty print JSON output
-        #[arg(short, long)]
-        pretty: bool,
-    },
+    }
 }
 
 impl Cli {

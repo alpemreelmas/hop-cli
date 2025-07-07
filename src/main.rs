@@ -47,18 +47,6 @@ fn run() -> Result<()> {
         Commands::Config { path, init } => {
             handle_config(path, init)?;
         }
-        Commands::Copy { server, source, destination, from } => {
-            handle_copy(server, source, destination, from)?;
-        }
-        Commands::Exec { server, command } => {
-            handle_exec(server, command)?;
-        }
-        Commands::Import { file, merge } => {
-            handle_import(file, merge)?;
-        }
-        Commands::Export { file, pretty } => {
-            handle_export(file, pretty)?;
-        }
     }
     
     Ok(())
