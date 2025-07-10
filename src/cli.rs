@@ -81,7 +81,10 @@ pub enum Commands {
         /// Initialize configuration file
         #[arg(short, long)]
         init: bool,
-    }
+    },
+
+    Login
+
 }
 
 impl Cli {

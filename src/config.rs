@@ -2,8 +2,8 @@ use crate::models::Server;
 use crate::utils::ensure_dir_exists;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::{Path, PathBuf};
+use std::{env, fs};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -117,7 +117,7 @@ fn get_config_path() -> Result<PathBuf> {
     let config_dir = dirs::config_dir()
         .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))?;
 
-    let hop_dir = config_dir.join("hop");
+    let hop_dir = config_dir.join(env::var("CONFIG_FOLDER").unwrap_or_else(|_| String::from("hop")));
     let config_path = hop_dir.join("servers.json");
 
     Ok(config_path)
@@ -156,7 +156,6 @@ pub fn init_config() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
 
     #[test]
     fn test_config_add_server() {

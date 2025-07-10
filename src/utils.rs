@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use colored::*;
 use std::fs;
 use std::path::Path;
+use std::process::Command;
 
 /// Print an error message in red
 pub fn print_error(message: &str) {
@@ -58,6 +59,18 @@ pub fn is_valid_server_name(name: &str) -> bool {
     !name.is_empty() && 
     name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_')
 }
+
+pub fn open_browser(url: &str) {
+    #[cfg(target_os = "windows")]
+    Command::new("cmd").args(&["/C", "start", url]).spawn().unwrap();
+
+    #[cfg(target_os = "macos")]
+    Command::new("open").arg(url).spawn().unwrap();
+
+    #[cfg(target_os = "linux")]
+    Command::new("xdg-open").arg(url).spawn().unwrap();
+}
+
 
 /// Prompt user for confirmation
 pub fn confirm_action(message: &str) -> bool {

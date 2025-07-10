@@ -3,29 +3,36 @@ mod config;
 mod models;
 mod ssh;
 mod utils;
+mod auth;
+mod commands;
 
 use cli::{Cli, Commands};
-use config::{load_config, save_config, get_config_file_path, init_config};
+use config::{get_config_file_path, init_config, load_config, save_config};
 use models::Server;
 use ssh::SshClient;
 use utils::{
-    print_error, print_success, print_info, print_warning, 
-    is_valid_ip, is_valid_server_name, confirm_action
+    confirm_action, is_valid_ip, is_valid_server_name, print_error,
+    print_info, print_success, print_warning
 };
 
+use crate::commands::login::run_login;
 use anyhow::Result;
 use colored::*;
+use dotenv::dotenv;
 use std::fs;
 use std::process;
 
-fn main() {
-    if let Err(e) = run() {
+#[tokio::main]
+async fn main() {
+    if let Err(e) = run().await {
         print_error(&format!("{}", e));
         process::exit(1);
     }
 }
 
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
+    dotenv().ok();
+
     let cli = Cli::new();
     
     match cli.command {
@@ -46,6 +53,9 @@ fn run() -> Result<()> {
         }
         Commands::Config { path, init } => {
             handle_config(path, init)?;
+        }
+        Commands::Login => {
+            run_login().await;
         }
     }
     

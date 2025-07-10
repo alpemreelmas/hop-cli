@@ -66,3 +66,5 @@ desktop.ini
 
 # === Other Tools ===
 /dist/
+.env
+.env.*
