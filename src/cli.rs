@@ -34,7 +34,7 @@ pub enum Commands {
         verbose: bool,
     },
 
-    /// Connect to a server via SSH
+    #[command(alias="c")]
     Connect {
         /// Server name to connect to
         identifier: String,

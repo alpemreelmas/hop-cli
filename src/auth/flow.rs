@@ -2,36 +2,37 @@ use crate::utils;
 use httpmock::prelude::*;
 use reqwest::Client;
 use serde::Deserialize;
-use serde_json::json;
 use std::env;
 use tokio::time::{sleep, Duration};
 
 #[derive(Deserialize, Debug)]
 struct DeviceCodeResponse {
-    device_code: String,
-    verification_uri: String,
+    code: String,
+    #[serde(rename = "verifyUrl")]
+    verify_url: String,
 }
 
 #[derive(Deserialize, Debug)]
 struct TokenResponse {
     access_token: String,
     expires_in: u64,
+    username: String,
 }
 
 /// Step 1: Start the login flow by requesting a device code from the server
 pub async fn start_login_flow() -> Result<String, Box<dyn std::error::Error>> {
     let client = Client::new();
     let res = client
-        .post(format!("{}/auth/device-code", env::var("SERVER_URL").expect("API_URL must be set")))
+        .post(format!("{}/api/cli/device/init", env::var("SERVER_URL").expect("API_URL must be set")))
         .send()
         .await?;
 
     let body: DeviceCodeResponse = res.json().await?;
 
-    println!("🔑 Please open this URL to log in:\n\n{}", body.verification_uri);
-    utils::open_browser(&body.verification_uri);
+    println!("🔑 Please open this URL to log in:\n\n{}", body.verify_url);
+    utils::open_browser(&body.verify_url);
 
-    Ok(body.device_code)
+    Ok(body.code)
 }
 
 /// Step 2: Poll the server every few seconds to wait for the user to log in
@@ -41,8 +42,8 @@ pub async fn poll_for_token(device_code: &str) -> Result<String, Box<dyn std::er
 
     for _ in 0..60 {
         let res = client
-            .post(format!("{}/auth/token", server_url))
-            .json(&serde_json::json!({ "device_code": device_code }))
+            .get(format!("{}/api/cli/device/verify", server_url))
+            .query(&[("code", device_code)])
             .send()
             .await;
 
@@ -66,13 +67,10 @@ async fn test_start_login_flow_success() {
     let server = MockServer::start();
 
     let _mock = server.mock(|when, then| {
-        when.method(POST).path("/auth/device-code");
+        when.method(POST).path("/api/cli/device/init");
         then.status(200)
             .header("Content-Type", "application/json")
-            .json_body(json!({
-                "device_code": "mock-device-code",
-                "verification_uri": "http://localhost/verify"
-            }));
+            .body(r#"{"code": "mock-device-code", "verifyUrl": "http://localhost/verify"}"#);
     });
 
     unsafe { env::set_var("SERVER_URL", &server.base_url()); }
@@ -86,13 +84,10 @@ async fn test_poll_for_token_success() {
     let server = MockServer::start();
 
     let _mock = server.mock(|when, then| {
-        when.method(POST).path("/auth/token");
+        when.method(GET).path("/api/cli/device/verify");
         then.status(200)
             .header("Content-Type", "application/json")
-            .json_body(json!({
-                "access_token": "mock-token",
-                "expires_in": 3600
-            }));
+            .body(r#"{"access_token": "mock-token", "expires_in": 3600, "username": "testuser"}"#);
     });
 
     unsafe { env::set_var("SERVER_URL", &server.base_url()); }
@@ -106,7 +101,7 @@ async fn test_poll_for_token_timeout() {
     let server = MockServer::start();
 
     let _mock = server.mock(|when, then| {
-        when.method(POST).path("/auth/token");
+        when.method(GET).path("/api/cli/device/verify");
         then.status(404);
     });
 
