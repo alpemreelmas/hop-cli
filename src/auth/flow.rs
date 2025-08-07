@@ -1,5 +1,8 @@
 use crate::utils;
-use httpmock::prelude::*;
+use httpmock::{
+    Method::{GET, POST},
+    MockServer,
+};
 use reqwest::Client;
 use serde::Deserialize;
 use std::env;
@@ -23,7 +26,10 @@ struct TokenResponse {
 pub async fn start_login_flow() -> Result<String, Box<dyn std::error::Error>> {
     let client = Client::new();
     let res = client
-        .post(format!("{}/api/cli/device/init", env::var("SERVER_URL").expect("API_URL must be set")))
+        .post(format!(
+            "{}/api/cli/device/init",
+            env::var("SERVER_URL").expect("API_URL must be set")
+        ))
         .send()
         .await?;
 
@@ -73,9 +79,11 @@ async fn test_start_login_flow_success() {
             .body(r#"{"code": "mock-device-code", "verifyUrl": "http://localhost/verify"}"#);
     });
 
-    unsafe { env::set_var("SERVER_URL", &server.base_url()); }
+    env::set_var("SERVER_URL", &server.base_url());
 
-    let device_code = start_login_flow().await.expect("Should get device code");
+    let device_code = start_login_flow()
+        .await
+        .expect("Should be mock-device-code");
     assert_eq!(device_code, "mock-device-code");
 }
 
@@ -84,15 +92,21 @@ async fn test_poll_for_token_success() {
     let server = MockServer::start();
 
     let _mock = server.mock(|when, then| {
-        when.method(GET).path("/api/cli/device/verify");
+        when.method(GET)
+            .path("/api/cli/device/verify")
+            .query_param("code", "mock-device-code");
         then.status(200)
             .header("Content-Type", "application/json")
             .body(r#"{"access_token": "mock-token", "expires_in": 3600, "username": "testuser"}"#);
     });
 
-    unsafe { env::set_var("SERVER_URL", &server.base_url()); }
+    unsafe {
+        env::set_var("SERVER_URL", &server.base_url());
+    }
 
-    let token = poll_for_token("mock-device-code").await.expect("Should receive token");
+    let token = poll_for_token("mock-device-code")
+        .await
+        .expect("Should receive token");
     assert_eq!(token, "mock-token");
 }
 
@@ -101,11 +115,15 @@ async fn test_poll_for_token_timeout() {
     let server = MockServer::start();
 
     let _mock = server.mock(|when, then| {
-        when.method(GET).path("/api/cli/device/verify");
+        when.method(GET)
+            .path("/api/cli/device/verify")
+            .query_param("code", "mock-device-code");
         then.status(404);
     });
 
-    unsafe { env::set_var("SERVER_URL", &server.base_url()); }
+    unsafe {
+        env::set_var("SERVER_URL", &server.base_url());
+    }
 
     let result = poll_for_token("mock-device-code").await;
     assert!(result.is_err());
