@@ -1,91 +1,184 @@
-name: Build and Release Hop CLI
+name: Build and Release Hop CLI Installer
 
 on:
   push:
-    tags: ["v*"] # only build & release on version tags
-  workflow_dispatch: # allow manual runs
-
-permissions:
-  contents: write # required for creating releases
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
 jobs:
-  build:
+  build-windows-installer:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+        
+    - name: Cache Rust dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        
+    - name: Build release binary
+      run: cargo build --release --verbose
+      
+    - name: Run tests
+      run: cargo test --verbose
+      
+    - name: Install NSIS
+      run: |
+        # Use Chocolatey to install NSIS (more reliable)
+        choco install nsis -y
+        
+        # Add NSIS to PATH for this session
+        $nsisPath = "${env:ProgramFiles(x86)}\NSIS"
+        echo "$nsisPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        
+    - name: Verify NSIS installation
+      run: |
+        makensis /VERSION
+        
+    - name: Create installer
+      run: |
+        makensis installer-simple.nsi
+        
+    - name: Get version from Cargo.toml
+      id: get_version
+      run: |
+        $version = (Get-Content Cargo.toml | Select-String 'version = "(.+)"').Matches[0].Groups[1].Value
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+        
+    - name: Rename installer with version
+      run: |
+        $version = "${{ steps.get_version.outputs.version }}"
+        $newName = "hop-cli-installer-v$version.exe"
+        Rename-Item "hop-cli-installer.exe" $newName
+        echo "INSTALLER_NAME=$newName" >> $env:GITHUB_ENV
+        
+    - name: Test installer exists
+      run: |
+        if (Test-Path $env:INSTALLER_NAME) {
+          Write-Host "✅ Installer created: $env:INSTALLER_NAME"
+          $size = (Get-Item $env:INSTALLER_NAME).Length
+          Write-Host "📦 Size: $([math]::Round($size/1MB, 2)) MB"
+        } else {
+          Write-Host "❌ Installer not found!"
+          exit 1
+        }
+        
+    - name: Upload installer as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: hop-cli-installer
+        path: ${{ env.INSTALLER_NAME }}
+        
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: ${{ env.INSTALLER_NAME }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        body: |
+          # Hop CLI v${{ steps.get_version.outputs.version }}
+          
+          ## 🚀 Installation
+          
+          **Windows Users:**
+          1. Download `${{ env.INSTALLER_NAME }}`
+          2. Run as Administrator
+          3. Follow the installation wizard
+          4. Open a new Command Prompt and run `hop --help`
+          
+          **Other Installation Methods:**
+          - Cargo: `cargo install --git https://github.com/${{ github.repository }}`
+          - Manual: Download and extract the binary
+          
+          ## ✨ Features
+          - Add, list, and manage SSH servers
+          - Connect to servers via SSH
+          - Copy files with SCP
+          - Execute remote commands
+          - Import/export server configurations
+          
+          ## 🔧 What's New
+          See the commit history for detailed changes.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Optional: Build for other platforms
+  build-cross-platform:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
-
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            suffix: ""
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            suffix: ""
+            
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Cargo registry
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Build release binary
-        run: cargo build --release --verbose
-
-      - name: Run tests
-        run: cargo test --verbose
-
-      # --- Windows only: build installer ---
-      - name: Install NSIS
-        if: matrix.os == 'windows-latest'
-        run: choco install nsis -y
-
-      - name: Create Windows installer
-        if: matrix.os == 'windows-latest'
-        run: makensis installer-simple.nsi
-
-      # --- Get version from Cargo.toml ---
-      - name: Get version
-        id: version
-        run: |
-          version=$(grep '^version =' Cargo.toml | head -1 | cut -d '"' -f2)
-          echo "version=$version" >> $GITHUB_OUTPUT
-
-      # --- Rename artifacts ---
-      - name: Rename binary
-        run: |
-          if [[ "${{ matrix.os }}" == "Windows_NT" ]]; then
-            mv hop-cli-installer.exe hop-cli-installer-v${{ steps.version.outputs.version }}.exe
-            echo "artifact=hop-cli-installer-v${{ steps.version.outputs.version }}.exe" >> $GITHUB_ENV
-          else
-            mv target/release/hop hop-cli-v${{ steps.version.outputs.version }}-linux-x86_64
-            echo "artifact=hop-cli-v${{ steps.version.outputs.version }}-linux-x86_64" >> $GITHUB_ENV
-          fi
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.artifact }}
-          path: ${{ env.artifact }}
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./dist
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ./dist/**
-          draft: false
-          prerelease: false
-          generate_release_notes: true
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+        
+    - name: Build binary
+      run: cargo build --release --target ${{ matrix.target }}
+      
+    - name: Get version from Cargo.toml
+      id: get_version
+      run: |
+        version=$(grep '^version = ' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+        echo "version=$version" >> $GITHUB_OUTPUT
+      
+    - name: Package binary
+      run: |
+        mkdir -p dist
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          cp target/${{ matrix.target }}/release/hop.exe dist/hop-v${{ steps.get_version.outputs.version }}-${{ matrix.target }}.exe
+        else
+          cp target/${{ matrix.target }}/release/hop dist/hop-v${{ steps.get_version.outputs.version }}-${{ matrix.target }}
+          chmod +x dist/hop-v${{ steps.get_version.outputs.version }}-${{ matrix.target }}
+        fi
+        
+    - name: Upload binary as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: hop-cli-${{ matrix.target }}
+        path: dist/hop-v${{ steps.get_version.outputs.version }}-${{ matrix.target }}*
+        
+    - name: Add to Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/hop-v${{ steps.get_version.outputs.version }}-${{ matrix.target }}*
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
